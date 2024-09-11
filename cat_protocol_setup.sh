@@ -250,9 +250,21 @@ repeated_mint() {
     # 开始执行 mint 操作
     for ((i = 1; i <= mint_count; i++)); do
         log "${GREEN}正在执行第 $i 次 mint...${NC}"
-        sudo yarn cli mint -i "${txid}_${index}" "$mint_amount" 2>&1 | tee -a $LOG_FILE
-        if [[ $? -ne 0 ]]; then
-            log_error "第 $i 次 mint 失败，请检查错误日志。"
+        
+        # 执行 mint 操作并捕获输出
+        mint_output=$(sudo yarn cli mint -i "${txid}_${index}" "$mint_amount" 2>&1)
+        
+        # 打印 mint 操作的输出到日志
+        echo "$mint_output" | tee -a $LOG_FILE
+
+        # 检查 mint 操作是否成功
+        if echo "$mint_output" | grep -q "TXID:"; then
+            # 提取成功的交易哈希 (TXID)
+            mint_txid=$(echo "$mint_output" | grep "TXID:" | awk -F ': ' '{print $2}')
+            log "${GREEN}第 $i 次 mint 成功，交易哈希: $mint_txid${NC}"
+        else
+            # 打印失败信息
+            log_error "第 $i 次 mint 失败，错误信息: $mint_output"
             return 1
         fi
     done
