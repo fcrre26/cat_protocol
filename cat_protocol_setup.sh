@@ -106,6 +106,12 @@ function run_docker_containers() {
 function create_wallet() {
     echo "创建新钱包..."
     
+    # 检查 packages/cli 目录是否存在
+    if [ ! -d "packages/cli" ]; then
+        log_error "错误: 找不到 packages/cli 目录，请检查项目结构。"
+        return 1
+    fi
+
     cd packages/cli || exit
 
     # 如果 config.json 不存在，创建一个新的配置文件
@@ -156,6 +162,12 @@ EOL
 function execute_mint() {
     echo "执行 mint 操作..."
     
+    # 检查 packages/cli 目录是否存在
+    if [ ! -d "packages/cli" ]; then
+        log_error "错误: 找不到 packages/cli 目录，请检查项目结构。"
+        return 1
+    fi
+
     cd packages/cli || exit
 
     # 显示已有的钱包信息
@@ -208,7 +220,7 @@ function execute_mint() {
 # 6. 查看 Fractal 节点运行情况
 function check_node_status() {
     echo "查看 Fractal 节点运行情况..."
-    
+
     cd packages/tracker || exit
     while true; do
         sudo docker-compose logs --tail=10
