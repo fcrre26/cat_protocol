@@ -12,6 +12,16 @@ readonly WALLETS_FILE="wallets.txt"
 # 项目根目录
 readonly PROJECT_DIR="$HOME/cat-token-box"
 
+# 检查日志文件的写入权限
+check_log_file_permissions() {
+    if [ ! -w "$LOG_FILE" ]; then
+        sudo chmod 664 "$LOG_FILE" || { log_error "无法设置日志文件权限。" ; exit 1; }
+    fi
+}
+
+# 在脚本开始时检查日志文件权限
+check_log_file_permissions
+
 # 打印菜单
 print_menu() {
     echo -e "${GREEN}请选择要执行的操作:${NC}"
@@ -37,20 +47,47 @@ log_error() {
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') : ${RED}$message${NC}" | tee -a $LOG_FILE
 }
 
+# 检查并安装依赖
+check_install_dependencies() {
+    if [ ! -d "node_modules" ]; then
+        log "${GREEN}node_modules 文件夹不存在，重新安装依赖...${NC}"
+        yarn install || { log_error "依赖安装失败，请检查 yarn 配置。" ; exit 1; }
+    fi
+}
+
 # 安装 Docker 和依赖
 install_dependencies() {
     log "${GREEN}正在安装 Docker 和依赖...${NC}"
-    sudo apt-get update | tee -a $LOG_FILE
-    sudo apt-get install docker.io -y | tee -a $LOG_FILE
-    sudo apt-get install npm -y | tee -a $LOG_FILE
-    sudo npm install n -g | tee -a $LOG_FILE
-    sudo n stable | tee -a $LOG_FILE
-    sudo npm i -g yarn | tee -a $LOG_FILE
+    
+    if ! command -v docker &>/dev/null; then
+        sudo apt-get update | tee -a $LOG_FILE
+        sudo apt-get install docker.io -y | tee -a $LOG_FILE
+    else
+        log "${GREEN}Docker 已安装，跳过安装步骤。${NC}"
+    fi
+
+    if ! command -v npm &>/dev/null; then
+        sudo apt-get install npm -y | tee -a $LOG_FILE
+    else
+        log "${GREEN}npm 已安装，跳过安装步骤。${NC}"
+    fi
+
+    if ! command -v yarn &>/dev/null; then
+        sudo npm i -g yarn | tee -a $LOG_FILE
+    else
+        log "${GREEN}yarn 已安装，跳过安装步骤。${NC}"
+    fi
+
     # 安装 docker-compose
     VERSION=$(curl --silent https://api.github.com/repos/docker/compose/releases/latest | grep -Po '"tag_name": "\K.*\d')
     DESTINATION=/usr/local/bin/docker-compose
-    sudo curl -L https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m) -o $DESTINATION | tee -a $LOG_FILE
-    sudo chmod 755 $DESTINATION | tee -a $LOG_FILE
+    if [ ! -f "$DESTINATION" ]; then
+        sudo curl -L https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m) -o $DESTINATION | tee -a $LOG_FILE
+        sudo chmod 755 $DESTINATION | tee -a $LOG_FILE
+    else
+        log "${GREEN}Docker Compose 已安装，跳过安装步骤。${NC}"
+    fi
+
     log "${GREEN}依赖安装完成。${NC}"
 }
 
@@ -63,15 +100,15 @@ clone_and_build() {
         log "${GREEN}项目已存在，跳过克隆步骤。${NC}"
     fi
     cd "$PROJECT_DIR"
-    sudo yarn install | tee -a $LOG_FILE
-    sudo yarn build | tee -a $LOG_FILE
+    sudo yarn install | tee -a $LOG_FILE || { log_error "依赖安装失败，请检查 yarn 配置。" ; exit 1; }
+    sudo yarn build | tee -a $LOG_FILE || { log_error "项目编译失败。" ; exit 1; }
     log "${GREEN}编译完成。${NC}"
 }
 
 # 检查 .env 文件并同步 config.json
 check_env_and_config() {
     local config_path="$1"
-    local env_path="$PROJECT_DIR/packages/tracker/.env"
+    local env_path="$2"  # 将 .env 文件路径作为参数
 
     # 检查 .env 文件是否存在
     if [ ! -f "$env_path" ]; then
@@ -86,7 +123,7 @@ check_env_and_config() {
     rpc_password=$(grep -E '^RPC_PASSWORD=' "$env_path" | cut -d '=' -f2)
 
     # 检查 config.json 是否存在
-    if [ ! -f "$config_path/config.json" ];then
+    if [ ! -f "$config_path/config.json" ]; then
         log "${GREEN}config.json 文件不存在，自动创建...${NC}"
 
         # 自动生成 config.json 模板
@@ -124,11 +161,8 @@ run_fractal_node() {
     sudo chmod 777 docker/data
     sudo chmod 777 docker/pgdata
 
-    sudo docker-compose up -d | tee -a $LOG_FILE
-    if [ $? -ne 0 ]; then
-        log_error "启动 Fractal 节点失败。请检查 docker-compose 的配置和日志。"
-        return 1
-    fi
+    sudo docker-compose up -d || { log_error "启动 Fractal 节点失败。请检查 docker-compose 的配置和日志。" ; exit 1; }
+    
     log "${GREEN}Fractal 节点运行成功。${NC}"
 
     cd "$PROJECT_DIR"
@@ -155,22 +189,14 @@ run_fractal_node() {
 create_new_wallet() {
     log "${GREEN}正在创建新钱包...${NC}"
 
-    # 确保进入项目根目录
     cd "$PROJECT_DIR/packages/cli" || { log_error "无法进入 $PROJECT_DIR/packages/cli 目录。"; return 1; }
 
-    # 检查依赖是否安装
-    if [ ! -d "node_modules" ]; then
-        log "${GREEN}node_modules 文件夹不存在，重新安装依赖...${NC}"
-        yarn install || fix_yarn_install
-    fi
+    check_install_dependencies
 
-    # 检查 .env 和 config.json 文件
-    check_env_and_config "$(pwd)"
+    check_env_and_config "$(pwd)" "$PROJECT_DIR/packages/tracker/.env"
 
-    # 执行 yarn cli wallet create 并提取输出中的助记词、私钥和地址
     wallet_info=$(sudo yarn cli wallet create 2>&1)
 
-    # 检查是否成功生成钱包
     if [[ $? -ne 0 || -z "$wallet_info" ]]; then
         log_error "钱包生成失败，请检查配置或依赖。"
         return 1
@@ -201,19 +227,12 @@ create_new_wallet() {
 repeated_mint() {
     log "${GREEN}执行重复 mint 操作...${NC}"
 
-    # 确保进入项目根目录
     cd "$PROJECT_DIR/packages/cli" || { log_error "无法进入 $PROJECT_DIR/packages/cli 目录。"; return 1; }
 
-    # 检查 config.json 是否存在
-    check_env_and_config "$(pwd)"
+    check_env_and_config "$(pwd)" "$PROJECT_DIR/packages/tracker/.env"
 
-    # 检查依赖是否安装
-    if [ ! -d "node_modules" ]; then
-        log "${GREEN}node_modules 文件夹不存在，重新安装依赖...${NC}"
-        yarn install || fix_yarn_install
-    fi
+    check_install_dependencies
 
-    # 选择钱包
     if [ ! -f "$WALLETS_FILE" ]; then
         log_error "钱包文件不存在，请先创建一个钱包。"
         return 1
@@ -241,64 +260,56 @@ repeated_mint() {
     selected_wallet="${wallets[$((wallet_choice - 1))]}"
     log "${GREEN}已选择的钱包地址: $selected_wallet${NC}"
 
-    # 输入交易哈希 (txid)
     read -p "请输入交易哈希 (txid): " txid
-
-    # 检查交易哈希是否为空
-    if [ -z "$txid" ]; then
-        log_error "交易哈希不能为空，请重新输入。"
+    if ! [[ "$txid" =~ ^[a-fA-F0-9]{64}$ ]]; then
+        log_error "无效的交易哈希，请输入正确的 64 位十六进制字符串。"
         return 1
     fi
 
-    # 输入交易索引 (index)
     read -p "请输入交易索引 (index): " index
-
-    # 检查索引是否为数字
     if ! [[ "$index" =~ ^[0-9]+$ ]]; then
         log_error "无效的交易索引，请输入一个正整数。"
         return 1
     fi
 
-    # 输入 mint 数量
     read -p "请输入要 mint 的数量: " mint_amount
-
     if ! [[ "$mint_amount" =~ ^[0-9]+$ ]]; then
         log_error "无效的 mint 数量，请输入一个正整数。"
         return 1
     fi
 
-    # 输入 mint 的次数
     read -p "请输入要执行 mint 的次数: " mint_count
-
     if ! [[ "$mint_count" =~ ^[0-9]+$ ]]; then
         log_error "无效的输入，请输入一个正整数。"
         return 1
     fi
 
-    # 开始执行 mint 操作
     for ((i = 1; i <= mint_count; i++)); do
         log "${GREEN}正在执行第 $i 次 mint...${NC}"
 
-        # 执行 mint 操作并捕获输出
         mint_output=$(sudo yarn cli mint -i "${txid}_${index}" "$mint_amount" --wallet "$selected_wallet" 2>&1)
         
-        # 打印 mint 操作的输出到日志
-        echo "$mint_output" | tee -a $LOG_FILE
-
-        # 检查 mint 操作是否成功
         if echo "$mint_output" | grep -q "TXID:"; then
-            # 提取成功的交易哈希 (TXID)
             mint_txid=$(echo "$mint_output" | grep "TXID:" | awk -F ': ' '{print $2}')
             log "${GREEN}第 $i 次 mint 成功，交易哈希: $mint_txid${NC}"
         else
-            # 打印失败信息
             log_error "第 $i 次 mint 失败，错误信息: $mint_output"
-            return 1
+            continue  # 继续执行后续步骤，而非退出循环
         fi
     done
 
     log "${GREEN}重复 mint 操作完成。${NC}"
 }
+
+# 清理 Docker 资源
+cleanup() {
+    log "清理 Docker 资源..."
+    sudo docker-compose down
+    sudo docker rm -f tracker
+}
+
+# 捕捉退出信号，执行清理
+trap cleanup EXIT
 
 # 查看 Fractal 节点运行日志
 view_fractal_node_logs() {
@@ -315,7 +326,8 @@ view_logs() {
 # 主程序
 while true; do
     print_menu
-    read -p "请输入选项 (1-8): " choice
+    read -p "请输入选项 (1-8) [默认 8]: " choice
+    choice=${choice:-8}  # 默认值为 8（退出）
 
     case $choice in
         1)
