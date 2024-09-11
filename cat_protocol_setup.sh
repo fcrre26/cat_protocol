@@ -24,6 +24,40 @@ function log_error() {
     echo -e "\033[31m$1\033[0m"  # 红色输出错误信息
 }
 
+# 检查 docker 和 docker-compose 是否可用
+function check_docker() {
+    # 检查 Docker 是否安装
+    if ! [ -x "$(command -v docker)" ]; then
+        log_error "Docker 未安装。请先选择 '1. 安装 Docker 和依赖' 选项。"
+        return 1
+    fi
+
+    # 检查 Docker 守护进程是否正在运行
+    if ! sudo systemctl is-active --quiet docker; then
+        log_error "Docker 守护进程未运行。正在启动..."
+        sudo systemctl start docker
+        if ! sudo systemctl is-active --quiet docker; then
+            log_error "无法启动 Docker 守护进程。请检查 Docker 安装。"
+            return 1
+        fi
+        echo "Docker 守护进程已启动。"
+    fi
+
+    # 检查 docker-compose 是否安装
+    if ! [ -x "$(command -v docker-compose)" ]; then
+        log_error "docker-compose 未找到，正在安装 docker-compose 插件..."
+        sudo apt-get update
+        sudo apt-get install docker-compose-plugin -y
+        if ! [ -x "$(command -v docker-compose)" ]; then
+            log_error "docker-compose 安装失败。请手动检查并安装。"
+            return 1
+        fi
+        echo "docker-compose 安装成功。"
+    fi
+
+    return 0
+}
+
 # 1. 安装 Docker 和依赖
 function install_dependencies() {
     if [ -f "$DOCKER_INSTALLED_FLAG" ]; then
@@ -79,6 +113,11 @@ function run_docker_containers() {
         return
     fi
 
+    # 检查 Docker 和 docker-compose
+    if ! check_docker; then
+        return 1
+    fi
+
     echo "运行 Fractal 节点和 CAT 索引器..."
     
     cd ./packages/tracker/ || exit
@@ -106,9 +145,9 @@ function run_docker_containers() {
 function create_wallet() {
     echo "创建新钱包..."
     
-    # 检查 packages/cli 目录是否存在
-    if [ ! -d "packages/cli" ]; then
-        log_error "错误: 找不到 packages/cli 目录，请检查项目结构。"
+    # 检查比特币 RPC 服务是否运行
+    if ! nc -z 127.0.0.1 8332; then
+        log_error "无法连接到比特币节点 (127.0.0.1:8332)。请确保比特币节点已启动。"
         return 1
     fi
 
@@ -162,9 +201,9 @@ EOL
 function execute_mint() {
     echo "执行 mint 操作..."
     
-    # 检查 packages/cli 目录是否存在
-    if [ ! -d "packages/cli" ]; then
-        log_error "错误: 找不到 packages/cli 目录，请检查项目结构。"
+    # 检查比特币 RPC 服务是否运行
+    if ! nc -z 127.0.0.1 8332; then
+        log_error "无法连接到比特币节点 (127.0.0.1:8332)。请确保比特币节点已启动。"
         return 1
     fi
 
@@ -220,6 +259,11 @@ function execute_mint() {
 # 6. 查看 Fractal 节点运行情况
 function check_node_status() {
     echo "查看 Fractal 节点运行情况..."
+
+    # 检查 docker-compose 是否安装
+    if ! check_docker; then
+        return 1
+    fi
 
     cd packages/tracker || exit
     while true; do
