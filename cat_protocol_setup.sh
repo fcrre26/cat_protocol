@@ -213,6 +213,15 @@ repeated_mint() {
         yarn install || fix_yarn_install
     fi
 
+    # 输入 mint 数量
+    read -p "请输入要 mint 的数量: " mint_amount
+
+    if ! [[ "$mint_amount" =~ ^[0-9]+$ ]]; then
+        log_error "无效的 mint 数量，请输入一个正整数。"
+        return 1
+    fi
+
+    # 输入 mint 的次数
     read -p "请输入要执行 mint 的次数: " mint_count
 
     if ! [[ "$mint_count" =~ ^[0-9]+$ ]]; then
@@ -220,9 +229,14 @@ repeated_mint() {
         return 1
     fi
 
+    # 硬编码的交易哈希和索引
+    txid="45ee725c2c5993b3e4d308842d87e973bf1951f5f7a804b21e4dd964ecd12d6b"
+    index="0"
+
+    # 开始执行 mint 操作
     for ((i = 1; i <= mint_count; i++)); do
         log "${GREEN}正在执行第 $i 次 mint...${NC}"
-        sudo yarn cli mint -i 45ee725c2c5993b3e4d308842d87e973bf1951f5f7a804b21e4dd964ecd12d6b_0 5 2>&1 | tee -a $LOG_FILE
+        sudo yarn cli mint -i "${txid}_${index}" "$mint_amount" 2>&1 | tee -a $LOG_FILE
         if [[ $? -ne 0 ]]; then
             log_error "第 $i 次 mint 失败，请检查错误日志。"
             return 1
