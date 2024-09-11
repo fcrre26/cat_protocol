@@ -68,27 +68,26 @@ clone_and_build() {
     log "${GREEN}编译完成。${NC}"
 }
 
-# 清除 yarn 缓存并重新安装依赖
-fix_yarn_install() {
-    log "${GREEN}检测到 yarn install 错误，正在清除缓存并重新安装依赖...${NC}"
-    yarn cache clean | tee -a $LOG_FILE
-    yarn install | tee -a $LOG_FILE
-    if [ $? -ne 0 ]; then
-        log_error "重新安装依赖失败，请检查网络连接或依赖配置。"
-        exit 1
-    else
-        log "${GREEN}依赖重新安装成功。${NC}"
-    fi
-}
-
-# 检查 config.json 文件
-check_or_create_config() {
+# 检查 .env 文件并同步 config.json
+check_env_and_config() {
     local config_path="$1"
+    local env_path="$PROJECT_DIR/packages/tracker/.env"
+
+    # 检查 .env 文件是否存在
+    if [ ! -f "$env_path" ]; then
+        log_error ".env 文件不存在，请确保 tracker 目录下存在 .env 文件。"
+        exit 1
+    fi
+
+    # 从 .env 文件中提取 username 和 password
+    local rpc_username
+    local rpc_password
+    rpc_username=$(grep -E '^RPC_USERNAME=' "$env_path" | cut -d '=' -f2)
+    rpc_password=$(grep -E '^RPC_PASSWORD=' "$env_path" | cut -d '=' -f2)
 
     # 检查 config.json 是否存在
-    if [ ! -f "$config_path/config.json" ]; then
-        log_error "config.json 文件不存在。请按照教程创建 config.json 文件。"
-        log "${GREEN}自动创建 config.json 文件模板...${NC}"
+    if [ ! -f "$config_path/config.json" ];then
+        log "${GREEN}config.json 文件不存在，自动创建...${NC}"
 
         # 自动生成 config.json 模板
         cat > "$config_path/config.json" <<EOL
@@ -99,16 +98,14 @@ check_or_create_config() {
   "maxFeeRate": 30,
   "rpc": {
       "url": "http://127.0.0.1:8332",
-      "username": "bitcoin",
-      "password": "opcatAwesome"
+      "username": "$rpc_username",
+      "password": "$rpc_password"
   }
 }
 EOL
-
-        log "${GREEN}config.json 模板已创建，请根据教程检查并修改内容。${NC}"
-        exit 1
+        log "${GREEN}config.json 文件已创建，请根据需要修改。${NC}"
     else
-        log "${GREEN}config.json 文件已存在，继续执行...${NC}"
+        log "${GREEN}config.json 文件已存在，继续执行。${NC}"
     fi
 }
 
@@ -167,8 +164,8 @@ create_new_wallet() {
         yarn install || fix_yarn_install
     fi
 
-    # 检查 config.json 文件
-    check_or_create_config "$(pwd)"
+    # 检查 .env 和 config.json 文件
+    check_env_and_config "$(pwd)"
 
     # 执行 yarn cli wallet create 并提取输出中的助记词、私钥和地址
     wallet_info=$(sudo yarn cli wallet create 2>&1)
@@ -208,7 +205,7 @@ repeated_mint() {
     cd "$PROJECT_DIR/packages/cli" || { log_error "无法进入 $PROJECT_DIR/packages/cli 目录。"; return 1; }
 
     # 检查 config.json 是否存在
-    check_or_create_config "$(pwd)"
+    check_env_and_config "$(pwd)"
 
     # 检查依赖是否安装
     if [ ! -d "node_modules" ]; then
