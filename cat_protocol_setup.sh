@@ -12,6 +12,11 @@ readonly WALLETS_FILE="wallets.txt"
 # 项目根目录
 readonly PROJECT_DIR="$HOME/cat-token-box"
 
+# 确保日志文件存在
+if [ ! -f "$LOG_FILE" ]; then
+    touch "$LOG_FILE" || { echo "无法创建日志文件 $LOG_FILE"; exit 1; }
+fi
+
 # 记录日志
 log() {
     local message="$1"
@@ -26,11 +31,6 @@ log_error() {
 
 # 检查日志文件的写入权限
 check_log_file_permissions() {
-    # 确保日志文件存在
-    if [ ! -f "$LOG_FILE" ]; then
-        touch "$LOG_FILE" || { echo "无法创建日志文件 $LOG_FILE"; exit 1; }
-    fi
-
     if [ ! -w "$LOG_FILE" ]; then
         sudo chmod 664 "$LOG_FILE" || { log_error "无法设置日志文件权限。" ; exit 1; }
     fi
