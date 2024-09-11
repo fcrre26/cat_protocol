@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # 自动化脚本菜单
-# 记录文件路径
 WALLET_LOG="wallet_info.txt"
 DOCKER_INSTALLED_FLAG="/tmp/docker_installed"
 REPO_CLONED_FLAG="/tmp/repo_cloned"
@@ -22,6 +21,21 @@ function print_menu() {
 # 错误日志函数
 function log_error() {
     echo -e "\033[31m$1\033[0m"  # 红色输出错误信息
+}
+
+# 检查 curl 是否安装
+function check_curl() {
+    if ! [ -x "$(command -v curl)" ]; then
+        echo "curl 未安装。正在安装 curl..."
+        sudo apt-get update
+        sudo apt-get install -y curl
+        if ! [ -x "$(command -v curl)" ]; then
+            log_error "curl 安装失败。请手动安装 curl。"
+            return 1
+        else
+            echo "curl 安装成功。"
+        fi
+    fi
 }
 
 # 检查 docker 和 docker-compose 是否可用
@@ -47,13 +61,14 @@ function check_docker() {
     if ! [ -x "$(command -v docker-compose)" ]; then
         log_error "docker-compose 未找到，正在安装 docker-compose 插件..."
         sudo apt-get update
-        
+
         # 先尝试通过官方包管理器安装 docker-compose-plugin
         sudo apt-get install -y docker-compose-plugin
-        
-        # 如果 docker-compose 仍然不可用，回退到使用 GitHub 安装
+
+        # 如果 docker-compose 仍然不可用，回退到使用 curl 安装
         if ! [ -x "$(command -v docker-compose)" ]; then
             log_error "docker-compose 插件安装失败，正在尝试使用 curl 安装 docker-compose。"
+            check_curl
             sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
         fi
@@ -81,6 +96,7 @@ function install_dependencies() {
     sudo apt-get install docker.io -y
 
     # 安装最新版本的 docker-compose
+    check_curl
     VERSION=$(curl --silent https://api.github.com/repos/docker/compose/releases/latest | grep -Po '"tag_name": "\K.*\d')
     DESTINATION=/usr/local/bin/docker-compose
     sudo curl -L https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m) -o $DESTINATION
@@ -129,9 +145,15 @@ function run_docker_containers() {
         return 1
     fi
 
+    # 检查目录是否存在
+    if [ ! -d "cat-token-box/packages/tracker/" ]; then
+        log_error "找不到 packages/tracker/ 目录，请检查仓库是否正确克隆。"
+        return 1
+    fi
+
     echo "运行 Fractal 节点和 CAT 索引器..."
-    
-    cd ./packages/tracker/ || exit
+
+    cd ./cat-token-box/packages/tracker/ || exit
     sudo chmod 777 docker/data
     sudo chmod 777 docker/pgdata
     sudo docker-compose up -d
@@ -162,7 +184,7 @@ function create_wallet() {
         return 1
     fi
 
-    cd packages/cli || exit
+    cd cat-token-box/packages/cli || exit
 
     # 如果 config.json 不存在，创建一个新的配置文件
     if [ ! -f config.json ]; then
@@ -218,9 +240,8 @@ function execute_mint() {
         return 1
     fi
 
-    cd packages/cli || exit
+    cd cat-token-box/packages/cli || exit
 
-    # 显示已有的钱包信息
     echo "可用钱包:"
     cat ../../$WALLET_LOG
 
@@ -276,7 +297,7 @@ function check_node_status() {
         return 1
     fi
 
-    cd packages/tracker || exit
+    cd cat-token-box/packages/tracker || exit
     while true; do
         sudo docker-compose logs --tail=10
         sleep 5
