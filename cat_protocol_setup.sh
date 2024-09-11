@@ -174,7 +174,7 @@ function run_docker_containers() {
     echo "Fractal 节点和 CAT 索引器已启动。"
 }
 
-# 4. 创建新钱包
+# 创建新钱包并捕获输出
 function create_wallet() {
     echo "创建新钱包..."
     
@@ -184,10 +184,12 @@ function create_wallet() {
         return 1
     fi
 
-    cd cat-token-box/packages/cli || exit
+    # 导航到 cli 目录
+    cd /root/cat-token-box/packages/cli || exit
 
-    # 如果 config.json 不存在，创建一个新的配置文件
+    # 确保 config.json 存在
     if [ ! -f config.json ]; then
+        echo "创建 config.json 配置文件..."
         cat > config.json <<EOL
 {
   "network": "fractal-mainnet",
@@ -204,18 +206,37 @@ EOL
     fi
 
     # 创建新钱包并捕获输出
-    WALLET_OUTPUT=$(sudo yarn cli wallet create)
+    echo "正在创建钱包，请稍候..."
+    WALLET_OUTPUT=$(sudo yarn cli wallet create 2>&1)
+    echo "命令输出："
+    echo "$WALLET_OUTPUT"
+    if [ $? -ne 0 ]; then
+        log_error "创建钱包失败: $WALLET_OUTPUT"
+        return 1
+    fi
 
-    # 提取助记词、私钥和地址
+    # 提取并打印助记词、私钥和地址（如果存在）
     MNEMONIC=$(echo "$WALLET_OUTPUT" | grep -oP '(?<=Mnemonic: ).*')
     PRIVATE_KEY=$(echo "$WALLET_OUTPUT" | grep -oP '(?<=Private Key: ).*')
     ADDRESS=$(echo "$WALLET_OUTPUT" | grep -oP '(?<=Taproot Address: ).*')
 
-    # 打印提取到的钱包信息
-    echo "钱包创建成功:"
-    echo "助记词: $MNEMONIC"
-    echo "私钥: $PRIVATE_KEY"
-    echo "地址 (Taproot格式): $ADDRESS"
+    if [ -n "$MNEMONIC" ]; then
+        echo "助记词: $MNEMONIC"
+    else
+        echo "助记词未提供."
+    fi
+
+    if [ -n "$PRIVATE_KEY" ]; then
+        echo "私钥: $PRIVATE_KEY"
+    else
+        echo "私钥未提供."
+    fi
+
+    if [ -n "$ADDRESS" ]; then
+        echo "地址 (Taproot格式): $ADDRESS"
+    else
+        echo "地址未提供."
+    fi
 
     # 记录钱包信息到文件
     echo "钱包信息已保存到 $WALLET_LOG"
@@ -225,11 +246,10 @@ EOL
         echo "私钥: $PRIVATE_KEY"
         echo "地址 (Taproot格式): $ADDRESS"
         echo "--------------------------"
-    } >> ../../$WALLET_LOG
+    } > $WALLET_LOG
 
     cd ../../
 }
-
 # 5. 执行 mint
 function execute_mint() {
     echo "执行 mint 操作..."
