@@ -213,6 +213,24 @@ repeated_mint() {
         yarn install || fix_yarn_install
     fi
 
+    # 输入交易哈希 (txid)
+    read -p "请输入交易哈希 (txid): " txid
+
+    # 检查交易哈希是否为空
+    if [ -z "$txid" ]; then
+        log_error "交易哈希不能为空，请重新输入。"
+        return 1
+    fi
+
+    # 输入交易索引 (index)
+    read -p "请输入交易索引 (index): " index
+
+    # 检查索引是否为数字
+    if ! [[ "$index" =~ ^[0-9]+$ ]]; then
+        log_error "无效的交易索引，请输入一个正整数。"
+        return 1
+    fi
+
     # 输入 mint 数量
     read -p "请输入要 mint 的数量: " mint_amount
 
@@ -228,10 +246,6 @@ repeated_mint() {
         log_error "无效的输入，请输入一个正整数。"
         return 1
     fi
-
-    # 硬编码的交易哈希和索引
-    txid="45ee725c2c5993b3e4d308842d87e973bf1951f5f7a804b21e4dd964ecd12d6b"
-    index="0"
 
     # 开始执行 mint 操作
     for ((i = 1; i <= mint_count; i++)); do
