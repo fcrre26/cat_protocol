@@ -3,6 +3,9 @@
 # 自动化脚本菜单
 # 记录文件路径
 WALLET_LOG="wallet_info.txt"
+DOCKER_INSTALLED_FLAG="/tmp/docker_installed"
+REPO_CLONED_FLAG="/tmp/repo_cloned"
+NODE_RUNNING_FLAG="/tmp/node_running"
 
 # 打印菜单选项
 function print_menu() {
@@ -23,6 +26,11 @@ function log_error() {
 
 # 1. 安装 Docker 和依赖
 function install_dependencies() {
+    if [ -f "$DOCKER_INSTALLED_FLAG" ]; then
+        echo "Docker 和依赖已安装，跳过此步骤。"
+        return
+    fi
+
     echo "安装 Docker 和依赖..."
     
     sudo apt-get update
@@ -38,11 +46,19 @@ function install_dependencies() {
     sudo n stable
     sudo npm i -g yarn
 
+    # 标记 Docker 已安装
+    touch "$DOCKER_INSTALLED_FLAG"
+
     echo "Docker 和依赖安装完成。"
 }
 
 # 2. 拉取 Git 仓库并编译
 function pull_and_build_repo() {
+    if [ -f "$REPO_CLONED_FLAG" ]; then
+        echo "Git 仓库已拉取并编译，跳过此步骤。"
+        return
+    fi
+
     echo "拉取 Git 仓库并编译..."
     
     git clone https://github.com/CATProtocol/cat-token-box
@@ -50,11 +66,19 @@ function pull_and_build_repo() {
     sudo yarn install
     sudo yarn build
 
+    # 标记 Git 仓库已拉取并编译
+    touch "$REPO_CLONED_FLAG"
+
     echo "Git 仓库拉取并编译完成。"
 }
 
 # 3. 运行 Fractal 节点和 CAT 索引器
 function run_docker_containers() {
+    if [ -f "$NODE_RUNNING_FLAG" ]; then
+        echo "Fractal 节点和 CAT 索引器已运行，跳过此步骤。"
+        return
+    fi
+
     echo "运行 Fractal 节点和 CAT 索引器..."
     
     cd ./packages/tracker/ || exit
@@ -71,6 +95,9 @@ function run_docker_containers() {
         -e RPC_HOST="host.docker.internal" \
         -p 3000:3000 \
         tracker:latest
+
+    # 标记节点已运行
+    touch "$NODE_RUNNING_FLAG"
 
     echo "Fractal 节点和 CAT 索引器已启动。"
 }
@@ -124,6 +151,7 @@ EOL
 
     cd ../../
 }
+
 # 5. 执行 mint
 function execute_mint() {
     echo "执行 mint 操作..."
