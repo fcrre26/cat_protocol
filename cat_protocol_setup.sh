@@ -9,6 +9,8 @@ readonly NC='\033[0m' # No Color
 readonly LOG_FILE="cat_protocol.log"
 # 钱包信息保存路径
 readonly WALLETS_FILE="wallets.txt"
+# 项目根目录
+readonly PROJECT_DIR="$HOME/cat-token-box"
 
 # 打印菜单
 print_menu() {
@@ -55,8 +57,12 @@ install_dependencies() {
 # 拉取 Git 仓库并编译
 clone_and_build() {
     log "${GREEN}正在拉取 Git 仓库并进行编译...${NC}"
-    git clone https://github.com/CATProtocol/cat-token-box | tee -a $LOG_FILE
-    cd cat-token-box
+    if [ ! -d "$PROJECT_DIR" ]; then
+        git clone https://github.com/CATProtocol/cat-token-box "$PROJECT_DIR" | tee -a $LOG_FILE
+    else
+        log "${GREEN}项目已存在，跳过克隆步骤。${NC}"
+    fi
+    cd "$PROJECT_DIR"
     sudo yarn install | tee -a $LOG_FILE
     sudo yarn build | tee -a $LOG_FILE
     log "${GREEN}编译完成。${NC}"
@@ -110,7 +116,13 @@ EOL
 run_fractal_node() {
     log "${GREEN}正在运行 Fractal 节点和 CAT 索引器...${NC}"
     
-    cd ./packages/tracker/ || { log_error "无法进入 ./packages/tracker/ 目录。"; return 1; }
+    # 检查 tracker 目录是否存在
+    if [ ! -d "$PROJECT_DIR/packages/tracker" ]; then
+        log_error "无法进入 $PROJECT_DIR/packages/tracker 目录，目录不存在。请确认仓库结构。"
+        return 1
+    fi
+
+    cd "$PROJECT_DIR/packages/tracker/" || { log_error "无法进入 $PROJECT_DIR/packages/tracker/ 目录。"; return 1; }
 
     sudo chmod 777 docker/data
     sudo chmod 777 docker/pgdata
@@ -122,7 +134,7 @@ run_fractal_node() {
     fi
     log "${GREEN}Fractal 节点运行成功。${NC}"
 
-    cd ../../
+    cd "$PROJECT_DIR"
     
     log "${GREEN}正在运行 CAT Protocol 本地索引器...${NC}"
     sudo docker build -t tracker:latest . | tee -a $LOG_FILE
@@ -147,7 +159,7 @@ create_new_wallet() {
     log "${GREEN}正在创建新钱包...${NC}"
 
     # 确保进入项目根目录
-    cd ~/cat-token-box/packages/cli || { log_error "无法进入 cat-token-box/packages/cli 目录。"; return 1; }
+    cd "$PROJECT_DIR/packages/cli" || { log_error "无法进入 $PROJECT_DIR/packages/cli 目录。"; return 1; }
 
     # 检查依赖是否安装
     if [ ! -d "node_modules" ]; then
@@ -193,7 +205,7 @@ repeated_mint() {
     log "${GREEN}执行重复 mint 操作...${NC}"
 
     # 确保进入项目根目录
-    cd ~/cat-token-box/packages/cli || { log_error "无法进入 cat-token-box/packages/cli 目录。"; return 1; }
+    cd "$PROJECT_DIR/packages/cli" || { log_error "无法进入 $PROJECT_DIR/packages/cli 目录。"; return 1; }
 
     # 检查 config.json 是否存在
     check_or_create_config "$(pwd)"
