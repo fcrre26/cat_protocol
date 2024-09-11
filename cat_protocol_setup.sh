@@ -12,8 +12,25 @@ readonly WALLETS_FILE="wallets.txt"
 # 项目根目录
 readonly PROJECT_DIR="$HOME/cat-token-box"
 
+# 记录日志
+log() {
+    local message="$1"
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') : $message" | tee -a $LOG_FILE
+}
+
+# 记录错误日志（红色）
+log_error() {
+    local message="$1"
+    echo -e "$(date '+%Y-%m-%d %H:%M:%S') : ${RED}$message${NC}" | tee -a $LOG_FILE
+}
+
 # 检查日志文件的写入权限
 check_log_file_permissions() {
+    # 确保日志文件存在
+    if [ ! -f "$LOG_FILE" ]; then
+        touch "$LOG_FILE" || { echo "无法创建日志文件 $LOG_FILE"; exit 1; }
+    fi
+
     if [ ! -w "$LOG_FILE" ]; then
         sudo chmod 664 "$LOG_FILE" || { log_error "无法设置日志文件权限。" ; exit 1; }
     fi
@@ -33,18 +50,6 @@ print_menu() {
     echo "6. 查看日志信息（自动刷新）"
     echo "7. 查看 Fractal 节点运行情况"
     echo "8. 退出"
-}
-
-# 记录日志
-log() {
-    local message="$1"
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') : $message" | tee -a $LOG_FILE
-}
-
-# 记录错误日志（红色）
-log_error() {
-    local message="$1"
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') : ${RED}$message${NC}" | tee -a $LOG_FILE
 }
 
 # 检查并安装依赖
