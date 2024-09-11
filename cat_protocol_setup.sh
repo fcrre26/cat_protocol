@@ -213,6 +213,34 @@ repeated_mint() {
         yarn install || fix_yarn_install
     fi
 
+    # 选择钱包
+    if [ ! -f "$WALLETS_FILE" ]; then
+        log_error "钱包文件不存在，请先创建一个钱包。"
+        return 1
+    fi
+
+    log "${GREEN}可用钱包列表:${NC}"
+    wallets=($(cat "$WALLETS_FILE"))
+
+    if [ ${#wallets[@]} -eq 0 ]; then
+        log_error "未找到可用钱包，请先创建一个钱包。"
+        return 1
+    fi
+
+    for i in "${!wallets[@]}"; do
+        echo "$((i + 1)). ${wallets[$i]}"
+    done
+
+    read -p "请选择一个钱包 (输入对应的数字): " wallet_choice
+
+    if ! [[ "$wallet_choice" =~ ^[0-9]+$ ]] || [ "$wallet_choice" -lt 1 ] || [ "$wallet_choice" -gt "${#wallets[@]}" ]; then
+        log_error "无效的选择，请输入有效的数字。"
+        return 1
+    fi
+
+    selected_wallet="${wallets[$((wallet_choice - 1))]}"
+    log "${GREEN}已选择的钱包地址: $selected_wallet${NC}"
+
     # 输入交易哈希 (txid)
     read -p "请输入交易哈希 (txid): " txid
 
@@ -250,9 +278,9 @@ repeated_mint() {
     # 开始执行 mint 操作
     for ((i = 1; i <= mint_count; i++)); do
         log "${GREEN}正在执行第 $i 次 mint...${NC}"
-        
+
         # 执行 mint 操作并捕获输出
-        mint_output=$(sudo yarn cli mint -i "${txid}_${index}" "$mint_amount" 2>&1)
+        mint_output=$(sudo yarn cli mint -i "${txid}_${index}" "$mint_amount" --wallet "$selected_wallet" 2>&1)
         
         # 打印 mint 操作的输出到日志
         echo "$mint_output" | tee -a $LOG_FILE
