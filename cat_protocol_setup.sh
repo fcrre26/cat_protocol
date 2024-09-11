@@ -47,7 +47,17 @@ function check_docker() {
     if ! [ -x "$(command -v docker-compose)" ]; then
         log_error "docker-compose 未找到，正在安装 docker-compose 插件..."
         sudo apt-get update
-        sudo apt-get install docker-compose-plugin -y
+        
+        # 先尝试通过官方包管理器安装 docker-compose-plugin
+        sudo apt-get install -y docker-compose-plugin
+        
+        # 如果 docker-compose 仍然不可用，回退到使用 GitHub 安装
+        if ! [ -x "$(command -v docker-compose)" ]; then
+            log_error "docker-compose 插件安装失败，正在尝试使用 curl 安装 docker-compose。"
+            sudo curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+        fi
+
         if ! [ -x "$(command -v docker-compose)" ]; then
             log_error "docker-compose 安装失败。请手动检查并安装。"
             return 1
@@ -70,6 +80,7 @@ function install_dependencies() {
     sudo apt-get update
     sudo apt-get install docker.io -y
 
+    # 安装最新版本的 docker-compose
     VERSION=$(curl --silent https://api.github.com/repos/docker/compose/releases/latest | grep -Po '"tag_name": "\K.*\d')
     DESTINATION=/usr/local/bin/docker-compose
     sudo curl -L https://github.com/docker/compose/releases/download/${VERSION}/docker-compose-$(uname -s)-$(uname -m) -o $DESTINATION
