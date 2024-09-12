@@ -281,21 +281,20 @@ EOL
           console.log(account.toWIF());  // 输出私钥
       })().catch(console.error);
     ")
-
-   ADDRESS=$(node -e "
+ADDRESS=$(node -e "
   (async () => {
       const bip39 = require('bip39');
-      const ecc = require('tiny-secp256k1');
+      const ecc = require('tiny-secp256k1');  // 使用 tiny-secp256k1 作为 ECC 库
       const BIP32Factory = require('bip32').default;
       const bitcoin = require('bitcoinjs-lib');
       
+      // 初始化 ECC 库
+      bitcoin.initEccLib(ecc);
+
       const bip32 = BIP32Factory(ecc);
       const { mnemonicToSeedSync } = bip39;
-      const { payments, initEccLib } = bitcoin;
+      const { payments } = bitcoin;
       
-      // 初始化 ECC 库
-      initEccLib(ecc);
-
       const mnemonic = '$MNEMONIC';
       const seed = mnemonicToSeedSync(mnemonic);
       const root = bip32.fromSeed(seed);
