@@ -268,7 +268,7 @@ EOL
         const mnemonic = '$MNEMONIC';
         const seed = bip39.mnemonicToSeedSync(mnemonic);
         const root = bitcoin.bip32.fromSeed(seed);
-        const account = root.derivePath('$ACCOUNT_PATH'.replace(/'/g, \"\\'\"));
+        const account = root.derivePath('m/86\'/0\'/0\'/0/0');
         console.log(account.toWIF());
     ")
 
@@ -279,7 +279,7 @@ EOL
         const mnemonic = '$MNEMONIC';
         const seed = bip39.mnemonicToSeedSync(mnemonic);
         const root = bitcoin.bip32.fromSeed(seed);
-        const account = root.derivePath('$ACCOUNT_PATH'.replace(/'/g, \"\\'\"));
+        const account = root.derivePath('m/86\'/0\'/0\'/0/0');
         const { address } = payments.p2tr({ pubkey: account.publicKey });
         console.log(address);
     ")
