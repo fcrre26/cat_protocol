@@ -124,8 +124,21 @@ function pull_and_build_repo() {
     
     git clone https://github.com/CATProtocol/cat-token-box
     cd cat-token-box || exit
+
+    # 安装项目依赖
     sudo yarn install
     sudo yarn build
+
+    # 安装 bip39 和 bitcoinjs-lib 依赖
+    echo "安装 bip39 和 bitcoinjs-lib..."
+    sudo npm install bip39 bitcoinjs-lib
+
+    if [ $? -ne 0 ]; then
+        log_error "npm 依赖安装失败。请手动检查。"
+        return 1
+    fi
+
+    echo "bip39 和 bitcoinjs-lib 依赖安装成功。"
 
     # 标记 Git 仓库已拉取并编译
     touch "$REPO_CLONED_FLAG"
@@ -227,33 +240,65 @@ EOL
         return 1
     fi
 
-    # 提取并打印助记词、私钥和地址（如果存在）
-    MNEMONIC=$(echo "$WALLET_OUTPUT" | grep -oP '(?<=Mnemonic: ).*')
-    PRIVATE_KEY=$(echo "$WALLET_OUTPUT" | grep -oP '(?<=Private Key: ).*')
-    ADDRESS=$(echo "$WALLET_OUTPUT" | grep -oP '(?<=Taproot Address: ).*')
-
-    # 检查提取结果并打印到终端
-    if [ -n "$MNEMONIC" ]; then
-        echo "助记词: $MNEMONIC"
-    else
-        log_error "助记词未提供或无法提取."
+    # 提取 wallet.json 文件内容
+    if [ ! -f wallet.json ]; then
+        log_error "未找到 wallet.json 文件，钱包创建失败。"
+        return 1
     fi
+
+    # 读取 wallet.json 文件
+    ACCOUNT_PATH=$(jq -r '.accountPath' wallet.json)
+    WALLET_NAME=$(jq -r '.name' wallet.json)
+    MNEMONIC=$(jq -r '.mnemonic' wallet.json)
+
+    if [ -z "$MNEMONIC" ]; then
+        log_error "未能从 wallet.json 提取助记词，钱包创建失败。"
+        return 1
+    fi
+
+    echo "助记词: $MNEMONIC"
+
+    # 使用助记词生成私钥和 Taproot 地址
+    echo "正在通过助记词生成私钥和 Taproot 地址..."
+
+    # 使用 bip39 和 bitcoinjs 库来生成私钥和地址
+    PRIVATE_KEY=$(node -e "
+        const bip39 = require('bip39');
+        const bitcoin = require('bitcoinjs-lib');
+        const mnemonic = '$MNEMONIC';
+        const seed = bip39.mnemonicToSeedSync(mnemonic);
+        const root = bitcoin.bip32.fromSeed(seed);
+        const account = root.derivePath('$ACCOUNT_PATH');
+        console.log(account.toWIF());
+    ")
+
+    ADDRESS=$(node -e "
+        const bip39 = require('bip39');
+        const bitcoin = require('bitcoinjs-lib');
+        const { payments } = require('bitcoinjs-lib');
+        const mnemonic = '$MNEMONIC';
+        const seed = bip39.mnemonicToSeedSync(mnemonic);
+        const root = bitcoin.bip32.fromSeed(seed);
+        const account = root.derivePath('$ACCOUNT_PATH');
+        const { address } = payments.p2tr({ pubkey: account.publicKey });
+        console.log(address);
+    ")
 
     if [ -n "$PRIVATE_KEY" ]; then
         echo "私钥: $PRIVATE_KEY"
     else
-        log_error "私钥未提供或无法提取."
+        log_error "私钥未生成或无法提取."
     fi
 
     if [ -n "$ADDRESS" ]; then
         echo "地址 (Taproot格式): $ADDRESS"
     else
-        log_error "地址未提供或无法提取."
+        log_error "地址未生成或无法提取."
     fi
 
-    # 如果助记词、私钥、地址都没有提取到，则退出函数
-    if [ -z "$MNEMONIC" ] && [ -z "$PRIVATE_KEY" ] && [ -z "$ADDRESS" ]; then
-        log_error "未能提取任何钱包信息，钱包创建失败。"
+    # 如果私钥和地址都没有生成，则退出函数
+    if [ -z "$PRIVATE_KEY" ] && [ -z "$ADDRESS" ]; then
+        log_error "未能生成任何钱包信息，钱包创建失败。"
         return 1
     fi
 
@@ -261,6 +306,7 @@ EOL
     echo "钱包信息已保存到 $WALLET_LOG"
     {
         echo "钱包创建时间: $(date)"
+        echo "钱包名称: $WALLET_NAME"
         echo "助记词: $MNEMONIC"
         echo "私钥: $PRIVATE_KEY"
         echo "地址 (Taproot格式): $ADDRESS"
