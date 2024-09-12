@@ -132,6 +132,7 @@ function pull_and_build_repo() {
     # 安装 bip39 和 bitcoinjs-lib 依赖
     echo "安装 bip39 和 bitcoinjs-lib..."
     sudo npm install bip39 bitcoinjs-lib
+    sudo npm install bip32 secp256k1
 
     if [ $? -ne 0 ]; then
         log_error "npm 依赖安装失败。请手动检查。"
@@ -193,7 +194,7 @@ function create_wallet() {
 
     # 检查比特币 RPC 服务是否运行
     if ! nc -z 127.0.0.1 8332; then
-        log_error "无法连接到比特币节点 (127.0.0.1:8332)。请确保比特币节点已启动。"
+        echo "无法连接到比特币节点 (127.0.0.1:8332)。请确保比特币节点已启动。"
         return 1
     fi
 
@@ -236,13 +237,13 @@ EOL
     WALLET_OUTPUT=$(sudo -E yarn cli wallet create 2>&1)  # 使用 sudo -E 保留环境变量
 
     if [ $? -ne 0 ]; then
-        log_error "创建钱包失败: $WALLET_OUTPUT"
+        echo "创建钱包失败: $WALLET_OUTPUT"
         return 1
     fi
 
     # 提取 wallet.json 文件内容
     if [ ! -f wallet.json ]; then
-        log_error "未找到 wallet.json 文件，钱包创建失败。"
+        echo "未找到 wallet.json 文件，钱包创建失败。"
         return 1
     fi
 
@@ -252,7 +253,7 @@ EOL
     MNEMONIC=$(jq -r '.mnemonic' wallet.json)
 
     if [ -z "$MNEMONIC" ]; then
-        log_error "未能从 wallet.json 提取助记词，钱包创建失败。"
+        echo "未能从 wallet.json 提取助记词，钱包创建失败。"
         return 1
     fi
 
@@ -265,12 +266,12 @@ EOL
     PRIVATE_KEY=$(node -e "
       (async () => {
           const bip39 = await import('bip39');
-          const bitcoin = await import('bitcoinjs-lib');
+          const bip32 = await import('bip32');  // 从 bip32 单独导入
+          const secp256k1 = await import('secp256k1');  // 导入 secp256k1
           const { mnemonicToSeedSync } = bip39;
-          const { bip32 } = bitcoin;
           const mnemonic = '$MNEMONIC';
           const seed = mnemonicToSeedSync(mnemonic);
-          const root = bip32.fromSeed(seed);
+          const root = bip32.BIP32Factory(secp256k1).fromSeed(seed);  // 使用 secp256k1 库生成密钥
           const account = root.derivePath('m/86\'/0\'/0\'/0/0');
           console.log(account.toWIF());
       })().catch(console.error);
@@ -279,13 +280,14 @@ EOL
     ADDRESS=$(node -e "
       (async () => {
           const bip39 = await import('bip39');
+          const bip32 = await import('bip32');  // 从 bip32 单独导入
+          const secp256k1 = await import('secp256k1');  // 导入 secp256k1
           const bitcoin = await import('bitcoinjs-lib');
           const { payments } = bitcoin;
           const { mnemonicToSeedSync } = bip39;
-          const { bip32 } = bitcoin;
           const mnemonic = '$MNEMONIC';
           const seed = mnemonicToSeedSync(mnemonic);
-          const root = bip32.fromSeed(seed);
+          const root = bip32.BIP32Factory(secp256k1).fromSeed(seed);  // 使用 secp256k1 库生成密钥
           const account = root.derivePath('m/86\'/0\'/0\'/0/0');
           const { address } = payments.p2tr({ pubkey: account.publicKey });
           console.log(address);
@@ -295,22 +297,23 @@ EOL
     if [ -n "$PRIVATE_KEY" ]; then
         echo "私钥: $PRIVATE_KEY"
     else
-        log_error "私钥未生成或无法提取."
+        echo "私钥未生成或无法提取."
     fi
 
     if [ -n "$ADDRESS" ]; then
         echo "地址 (Taproot格式): $ADDRESS"
     else
-        log_error "地址未生成或无法提取."
+        echo "地址未生成或无法提取."
     fi
 
     # 如果私钥和地址都没有生成，则退出函数
     if [ -z "$PRIVATE_KEY" ] && [ -z "$ADDRESS" ]; then
-        log_error "未能生成任何钱包信息，钱包创建失败。"
+        echo "未能生成任何钱包信息，钱包创建失败。"
         return 1
     fi
 
     # 记录钱包信息到文件，带有时间戳
+    WALLET_LOG="wallet_creation_log.txt"
     echo "钱包信息已保存到 $WALLET_LOG"
     {
         echo "钱包创建时间: $(date)"
@@ -324,7 +327,6 @@ EOL
     # 返回上级目录
     cd ../../
 }
-
 # 5. 执行 mint
 function execute_mint() {
     echo "执行 mint 操作..."
