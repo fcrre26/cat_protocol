@@ -265,32 +265,42 @@ EOL
     # 修复后的生成私钥和地址代码
     PRIVATE_KEY=$(node -e "
       (async () => {
-          const bip39 = await import('bip39');
-          const ecc = await import('secp256k1');
-          const bip32 = (await import('bip32')).BIP32Factory(ecc);
+          const bip39 = require('bip39');
+          const ecc = require('tiny-secp256k1');  // 使用正确的 secp256k1 实现
+          const BIP32Factory = require('bip32').default;
+
+          const bip32 = BIP32Factory(ecc);   // 创建 bip32 工厂
+          const bitcoin = require('bitcoinjs-lib');
+          
           const { mnemonicToSeedSync } = bip39;
           const mnemonic = '$MNEMONIC';
           const seed = mnemonicToSeedSync(mnemonic);
           const root = bip32.fromSeed(seed);
-          const account = root.derivePath('m/86\'/0\'/0\'/0/0');
-          console.log(account.toWIF());
+          const account = root.derivePath('m/86\'/0\'/0\'/0/0');  // 导出路径
+          
+          console.log(account.toWIF());  // 输出私钥
       })().catch(console.error);
     ")
 
     ADDRESS=$(node -e "
       (async () => {
-          const bip39 = await import('bip39');
-          const ecc = await import('secp256k1');
-          const bip32 = (await import('bip32')).BIP32Factory(ecc);
-          const bitcoin = await import('bitcoinjs-lib');
-          const { payments } = bitcoin;
+          const bip39 = require('bip39');
+          const ecc = require('tiny-secp256k1');  // 使用正确的 secp256k1 实现
+          const BIP32Factory = require('bip32').default;
+
+          const bip32 = BIP32Factory(ecc);  // 创建 bip32 工厂
+          const bitcoin = require('bitcoinjs-lib');
+          
           const { mnemonicToSeedSync } = bip39;
+          const { payments } = bitcoin;
+          
           const mnemonic = '$MNEMONIC';
           const seed = mnemonicToSeedSync(mnemonic);
           const root = bip32.fromSeed(seed);
-          const account = root.derivePath('m/86\'/0\'/0\'/0/0');
-          const { address } = payments.p2tr({ pubkey: account.publicKey });
-          console.log(address);
+          const account = root.derivePath('m/86\'/0\'/0\'/0/0');  // 导出路径
+          
+          const { address } = payments.p2tr({ pubkey: account.publicKey });  // 生成 Taproot 地址
+          console.log(address);  // 输出地址
       })().catch(console.error);
     ")
 
