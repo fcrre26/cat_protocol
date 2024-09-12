@@ -232,25 +232,32 @@ EOL
     PRIVATE_KEY=$(echo "$WALLET_OUTPUT" | grep -oP '(?<=Private Key: ).*')
     ADDRESS=$(echo "$WALLET_OUTPUT" | grep -oP '(?<=Taproot Address: ).*')
 
+    # 检查提取结果并打印到终端
     if [ -n "$MNEMONIC" ]; then
         echo "助记词: $MNEMONIC"
     else
-        echo "助记词未提供."
+        log_error "助记词未提供或无法提取."
     fi
 
     if [ -n "$PRIVATE_KEY" ]; then
         echo "私钥: $PRIVATE_KEY"
     else
-        echo "私钥未提供."
+        log_error "私钥未提供或无法提取."
     fi
 
     if [ -n "$ADDRESS" ]; then
         echo "地址 (Taproot格式): $ADDRESS"
     else
-        echo "地址未提供."
+        log_error "地址未提供或无法提取."
     fi
 
-    # 记录钱包信息到文件
+    # 如果助记词、私钥、地址都没有提取到，则退出函数
+    if [ -z "$MNEMONIC" ] && [ -z "$PRIVATE_KEY" ] && [ -z "$ADDRESS" ]; then
+        log_error "未能提取任何钱包信息，钱包创建失败。"
+        return 1
+    fi
+
+    # 记录钱包信息到文件，带有时间戳
     echo "钱包信息已保存到 $WALLET_LOG"
     {
         echo "钱包创建时间: $(date)"
@@ -258,7 +265,7 @@ EOL
         echo "私钥: $PRIVATE_KEY"
         echo "地址 (Taproot格式): $ADDRESS"
         echo "--------------------------"
-    } >> $WALLET_LOG
+    } >> "$WALLET_LOG"
 
     # 返回上级目录
     cd ../../
