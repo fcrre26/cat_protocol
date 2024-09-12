@@ -174,10 +174,10 @@ function run_docker_containers() {
     echo "Fractal 节点和 CAT 索引器已启动。"
 }
 
-# 创建新钱包并捕获输出
+# 4. 创建新钱包
 function create_wallet() {
     echo "创建新钱包..."
-    
+
     # 检查比特币 RPC 服务是否运行
     if ! nc -z 127.0.0.1 8332; then
         log_error "无法连接到比特币节点 (127.0.0.1:8332)。请确保比特币节点已启动。"
@@ -187,16 +187,19 @@ function create_wallet() {
     # 导航到 cli 目录
     cd /root/cat-token-box/packages/cli || exit
 
-    # 确保 config.json 存在，并且根据教程生成 config.json 文件
+    # 检查并生成 config.json 文件
     if [ ! -f config.json ]; then
         echo "config.json 文件未找到，正在创建..."
-        # 获取用户输入的比特币 RPC 用户名和密码
-        read -p "请输入比特币 RPC 用户名 [默认: bitcoin]: " rpc_username
-        rpc_username=${rpc_username:-bitcoin}
-        read -p "请输入比特币 RPC 密码 [默认: opcatAwesome]: " rpc_password
-        rpc_password=${rpc_password:-opcatAwesome}
 
-        # 创建 config.json 文件并填入必要的配置
+        # 提示用户输入比特币 RPC 用户名，默认值为 'bitcoin'
+        read -p "请输入比特币 RPC 用户名 [默认: bitcoin]: " rpc_username
+        rpc_username=${rpc_username:-bitcoin}  # 如果用户直接按回车，使用默认值 'bitcoin'
+
+        # 提示用户输入比特币 RPC 密码，默认值为 'opcatAwesome'
+        read -p "请输入比特币 RPC 密码 [默认: opcatAwesome]: " rpc_password
+        rpc_password=${rpc_password:-opcatAwesome}  # 如果用户直接按回车，使用默认值 'opcatAwesome'
+
+        # 生成 config.json 文件
         cat > config.json <<EOL
 {
   "network": "fractal-mainnet",
@@ -218,7 +221,7 @@ EOL
     # 创建新钱包并捕获输出，确保 yarn 命令可以被执行
     echo "正在创建钱包，请稍候..."
     WALLET_OUTPUT=$(sudo -E yarn cli wallet create 2>&1)  # 使用 sudo -E 保留环境变量
-    
+
     if [ $? -ne 0 ]; then
         log_error "创建钱包失败: $WALLET_OUTPUT"
         return 1
@@ -257,6 +260,7 @@ EOL
         echo "--------------------------"
     } >> $WALLET_LOG
 
+    # 返回上级目录
     cd ../../
 }
 
