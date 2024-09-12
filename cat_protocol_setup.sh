@@ -131,7 +131,7 @@ function pull_and_build_repo() {
 
     # 安装兼容版本的 bip39 和 bitcoinjs-lib 依赖
     echo "安装 bip39, bip32 和 bitcoinjs-lib..."
-    npm install bip39@3.0.4 bitcoinjs-lib@6.1.0 bip32@2.0.6 secp256k1@4.0.2 tiny-secp256k1@1.1.7
+    npm install bip39@3.0.4 bitcoinjs-lib@6.1.0 bip32@2.0.6 secp256k1@4.0.2 tiny-secp256k1@^1.0.0
 
     if [ $? -ne 0 ]; then
         log_error "npm 依赖安装失败。请手动检查。"
