@@ -187,9 +187,16 @@ function create_wallet() {
     # 导航到 cli 目录
     cd /root/cat-token-box/packages/cli || exit
 
-    # 确保 config.json 存在
+    # 确保 config.json 存在，并且根据教程生成 config.json 文件
     if [ ! -f config.json ]; then
-        echo "创建 config.json 配置文件..."
+        echo "config.json 文件未找到，正在创建..."
+        # 获取用户输入的比特币 RPC 用户名和密码
+        read -p "请输入比特币 RPC 用户名 [默认: bitcoin]: " rpc_username
+        rpc_username=${rpc_username:-bitcoin}
+        read -p "请输入比特币 RPC 密码 [默认: opcatAwesome]: " rpc_password
+        rpc_password=${rpc_password:-opcatAwesome}
+
+        # 创建 config.json 文件并填入必要的配置
         cat > config.json <<EOL
 {
   "network": "fractal-mainnet",
@@ -198,18 +205,20 @@ function create_wallet() {
   "maxFeeRate": 30,
   "rpc": {
       "url": "http://127.0.0.1:8332",
-      "username": "bitcoin",
-      "password": "opcatAwesome"
+      "username": "$rpc_username",
+      "password": "$rpc_password"
   }
 }
 EOL
+        echo "config.json 文件已创建。"
+    else
+        echo "config.json 文件已存在，跳过创建。"
     fi
 
     # 创建新钱包并捕获输出
     echo "正在创建钱包，请稍候..."
     WALLET_OUTPUT=$(sudo yarn cli wallet create 2>&1)
-    echo "命令输出："
-    echo "$WALLET_OUTPUT"
+    
     if [ $? -ne 0 ]; then
         log_error "创建钱包失败: $WALLET_OUTPUT"
         return 1
@@ -246,10 +255,11 @@ EOL
         echo "私钥: $PRIVATE_KEY"
         echo "地址 (Taproot格式): $ADDRESS"
         echo "--------------------------"
-    } > $WALLET_LOG
+    } >> $WALLET_LOG
 
     cd ../../
 }
+
 # 5. 执行 mint
 function execute_mint() {
     echo "执行 mint 操作..."
