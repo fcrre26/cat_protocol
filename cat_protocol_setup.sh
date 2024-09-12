@@ -187,7 +187,7 @@ function run_docker_containers() {
     echo "Fractal 节点和 CAT 索引器已启动。"
 }
 
-# 4. 创建新钱包
+# 创建新钱包函数
 function create_wallet() {
     echo "创建新钱包..."
 
@@ -261,27 +261,35 @@ EOL
     # 使用助记词生成私钥和 Taproot 地址
     echo "正在通过助记词生成私钥和 Taproot 地址..."
 
-    # 使用 bip39 和 bitcoinjs 库来生成私钥和地址
+    # 使用 ESM 模式脚本生成私钥和地址
     PRIVATE_KEY=$(node -e "
-        const bip39 = require('bip39');
-        const bitcoin = require('bitcoinjs-lib');
-        const mnemonic = '$MNEMONIC';
-        const seed = bip39.mnemonicToSeedSync(mnemonic);
-        const root = bitcoin.bip32.fromSeed(seed);
-        const account = root.derivePath('m/86\'/0\'/0\'/0/0');
-        console.log(account.toWIF());
+      (async () => {
+          const bip39 = await import('bip39');
+          const bitcoin = await import('bitcoinjs-lib');
+          const { mnemonicToSeedSync } = bip39;
+          const { bip32 } = bitcoin;
+          const mnemonic = '$MNEMONIC';
+          const seed = mnemonicToSeedSync(mnemonic);
+          const root = bip32.fromSeed(seed);
+          const account = root.derivePath('m/86\'/0\'/0\'/0/0');
+          console.log(account.toWIF());
+      })().catch(console.error);
     ")
 
     ADDRESS=$(node -e "
-        const bip39 = require('bip39');
-        const bitcoin = require('bitcoinjs-lib');
-        const { payments } = require('bitcoinjs-lib');
-        const mnemonic = '$MNEMONIC';
-        const seed = bip39.mnemonicToSeedSync(mnemonic);
-        const root = bitcoin.bip32.fromSeed(seed);
-        const account = root.derivePath('m/86\'/0\'/0\'/0/0');
-        const { address } = payments.p2tr({ pubkey: account.publicKey });
-        console.log(address);
+      (async () => {
+          const bip39 = await import('bip39');
+          const bitcoin = await import('bitcoinjs-lib');
+          const { payments } = bitcoin;
+          const { mnemonicToSeedSync } = bip39;
+          const { bip32 } = bitcoin;
+          const mnemonic = '$MNEMONIC';
+          const seed = mnemonicToSeedSync(mnemonic);
+          const root = bip32.fromSeed(seed);
+          const account = root.derivePath('m/86\'/0\'/0\'/0/0');
+          const { address } = payments.p2tr({ pubkey: account.publicKey });
+          console.log(address);
+      })().catch(console.error);
     ")
 
     if [ -n "$PRIVATE_KEY" ]; then
