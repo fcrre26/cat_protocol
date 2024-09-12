@@ -215,9 +215,9 @@ EOL
         echo "config.json 文件已存在，跳过创建。"
     fi
 
-    # 创建新钱包并捕获输出
+    # 创建新钱包并捕获输出，确保 yarn 命令可以被执行
     echo "正在创建钱包，请稍候..."
-    WALLET_OUTPUT=$(sudo yarn cli wallet create 2>&1)
+    WALLET_OUTPUT=$(sudo -E yarn cli wallet create 2>&1)  # 使用 sudo -E 保留环境变量
     
     if [ $? -ne 0 ]; then
         log_error "创建钱包失败: $WALLET_OUTPUT"
