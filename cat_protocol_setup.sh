@@ -129,10 +129,9 @@ function pull_and_build_repo() {
     sudo yarn install
     sudo yarn build
 
-    # 安装 bip39 和 bitcoinjs-lib 依赖
-    echo "安装 bip39 和 bitcoinjs-lib..."
-    sudo npm install bip39 bitcoinjs-lib
-    sudo npm install bip32 secp256k1
+    # 安装兼容版本的 bip39 和 bitcoinjs-lib 依赖
+    echo "安装 bip39, bip32 和 bitcoinjs-lib..."
+    sudo npm install bip39@3.0.4 bitcoinjs-lib@6.1.0 bip32@2.0.6 secp256k1@4.0.2
 
     if [ $? -ne 0 ]; then
         log_error "npm 依赖安装失败。请手动检查。"
@@ -146,49 +145,7 @@ function pull_and_build_repo() {
 
     echo "Git 仓库拉取并编译完成。"
 }
-
-# 3. 运行 Fractal 节点和 CAT 索引器
-function run_docker_containers() {
-    if [ -f "$NODE_RUNNING_FLAG" ]; then
-        echo "Fractal 节点和 CAT 索引器已运行，跳过此步骤。"
-        return
-    fi
-
-    # 检查 Docker 和 docker-compose
-    if ! check_docker; then
-        return 1
-    fi
-
-    # 检查目录是否存在
-    if [ ! -d "cat-token-box/packages/tracker/" ]; then
-        log_error "找不到 packages/tracker/ 目录，请检查仓库是否正确克隆。"
-        return 1
-    fi
-
-    echo "运行 Fractal 节点和 CAT 索引器..."
-
-    cd ./cat-token-box/packages/tracker/ || exit
-    sudo chmod 777 docker/data
-    sudo chmod 777 docker/pgdata
-    sudo docker-compose up -d
-
-    cd ../../
-    sudo docker build -t tracker:latest .
-    sudo docker run -d \
-        --name tracker \
-        --add-host="host.docker.internal:host-gateway" \
-        -e DATABASE_HOST="host.docker.internal" \
-        -e RPC_HOST="host.docker.internal" \
-        -p 3000:3000 \
-        tracker:latest
-
-    # 标记节点已运行
-    touch "$NODE_RUNNING_FLAG"
-
-    echo "Fractal 节点和 CAT 索引器已启动。"
-}
-
-# 创建新钱包函数
+# 4. 创建新钱包
 function create_wallet() {
     echo "创建新钱包..."
 
@@ -207,11 +164,11 @@ function create_wallet() {
 
         # 提示用户输入比特币 RPC 用户名，默认值为 'bitcoin'
         read -p "请输入比特币 RPC 用户名 [默认: bitcoin]: " rpc_username
-        rpc_username=${rpc_username:-bitcoin}  # 如果用户直接按回车，使用默认值 'bitcoin'
+        rpc_username=${rpc_username:-bitcoin}
 
         # 提示用户输入比特币 RPC 密码，默认值为 'opcatAwesome'
         read -p "请输入比特币 RPC 密码 [默认: opcatAwesome]: " rpc_password
-        rpc_password=${rpc_password:-opcatAwesome}  # 如果用户直接按回车，使用默认值 'opcatAwesome'
+        rpc_password=${rpc_password:-opcatAwesome}
 
         # 生成 config.json 文件
         cat > config.json <<EOL
@@ -232,9 +189,9 @@ EOL
         echo "config.json 文件已存在，跳过创建。"
     fi
 
-    # 创建新钱包并捕获输出，确保 yarn 命令可以被执行
+    # 创建新钱包并捕获输出
     echo "正在创建钱包，请稍候..."
-    WALLET_OUTPUT=$(sudo -E yarn cli wallet create 2>&1)  # 使用 sudo -E 保留环境变量
+    WALLET_OUTPUT=$(sudo -E yarn cli wallet create 2>&1)
 
     if [ $? -ne 0 ]; then
         echo "创建钱包失败: $WALLET_OUTPUT"
@@ -262,16 +219,16 @@ EOL
     # 使用助记词生成私钥和 Taproot 地址
     echo "正在通过助记词生成私钥和 Taproot 地址..."
 
-    # 使用 ESM 模式脚本生成私钥和地址
+    # 修复后的生成私钥和地址代码
     PRIVATE_KEY=$(node -e "
       (async () => {
           const bip39 = await import('bip39');
-          const bip32 = await import('bip32');  // 从 bip32 单独导入
-          const secp256k1 = await import('secp256k1');  // 导入 secp256k1
+          const ecc = await import('secp256k1');
+          const bip32 = (await import('bip32')).BIP32Factory(ecc);
           const { mnemonicToSeedSync } = bip39;
           const mnemonic = '$MNEMONIC';
           const seed = mnemonicToSeedSync(mnemonic);
-          const root = bip32.BIP32Factory(secp256k1).fromSeed(seed);  // 使用 secp256k1 库生成密钥
+          const root = bip32.fromSeed(seed);
           const account = root.derivePath('m/86\'/0\'/0\'/0/0');
           console.log(account.toWIF());
       })().catch(console.error);
@@ -280,14 +237,14 @@ EOL
     ADDRESS=$(node -e "
       (async () => {
           const bip39 = await import('bip39');
-          const bip32 = await import('bip32');  // 从 bip32 单独导入
-          const secp256k1 = await import('secp256k1');  // 导入 secp256k1
+          const ecc = await import('secp256k1');
+          const bip32 = (await import('bip32')).BIP32Factory(ecc);
           const bitcoin = await import('bitcoinjs-lib');
           const { payments } = bitcoin;
           const { mnemonicToSeedSync } = bip39;
           const mnemonic = '$MNEMONIC';
           const seed = mnemonicToSeedSync(mnemonic);
-          const root = bip32.BIP32Factory(secp256k1).fromSeed(seed);  // 使用 secp256k1 库生成密钥
+          const root = bip32.fromSeed(seed);
           const account = root.derivePath('m/86\'/0\'/0\'/0/0');
           const { address } = payments.p2tr({ pubkey: account.publicKey });
           console.log(address);
@@ -327,6 +284,7 @@ EOL
     # 返回上级目录
     cd ../../
 }
+
 # 5. 执行 mint
 function execute_mint() {
     echo "执行 mint 操作..."
