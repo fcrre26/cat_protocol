@@ -145,6 +145,49 @@ function pull_and_build_repo() {
 
     echo "Git 仓库拉取并编译完成。"
 }
+
+# 3. 运行 Fractal 节点和 CAT 索引器
+function run_docker_containers() {
+    if [ -f "$NODE_RUNNING_FLAG" ]; then
+        echo "Fractal 节点和 CAT 索引器已运行，跳过此步骤。"
+        return
+    fi
+
+    # 检查 Docker 和 docker-compose
+    if ! check_docker; then
+        return 1
+    fi
+
+    # 检查目录是否存在
+    if [ ! -d "cat-token-box/packages/tracker/" ]; then
+        log_error "找不到 packages/tracker/ 目录，请检查仓库是否正确克隆。"
+        return 1
+    fi
+
+    echo "运行 Fractal 节点和 CAT 索引器..."
+
+    cd ./cat-token-box/packages/tracker/ || exit
+    sudo chmod 777 docker/data
+    sudo chmod 777 docker/pgdata
+    sudo docker-compose up -d
+
+    cd ../../
+    sudo docker build -t tracker:latest .
+    sudo docker run -d \
+        --name tracker \
+        --add-host="host.docker.internal:host-gateway" \
+        -e DATABASE_HOST="host.docker.internal" \
+        -e RPC_HOST="host.docker.internal" \
+        -p 3000:3000 \
+        tracker:latest
+
+    # 标记节点已运行
+    touch "$NODE_RUNNING_FLAG"
+
+    echo "Fractal 节点和 CAT 索引器已启动。"
+}
+
+
 # 4. 创建新钱包
 function create_wallet() {
     echo "创建新钱包..."
