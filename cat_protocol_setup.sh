@@ -282,28 +282,32 @@ EOL
       })().catch(console.error);
     ")
 
-   ADDRESS=$(node -e "
-  (async () => {
-      const bip39 = require('bip39');
-      const ecc = require('tiny-secp256k1');
-      const BIP32Factory = require('bip32').default;
-      const bitcoin = require('bitcoinjs-lib');
-      
-      const bip32 = BIP32Factory(ecc);
-      const { mnemonicToSeedSync } = bip39;
-      const { payments, taproot } = bitcoin;
-      
-      const mnemonic = '$MNEMONIC';
-      const seed = mnemonicToSeedSync(mnemonic);
-      const root = bip32.fromSeed(seed);
-      const account = root.derivePath('m/86\'/0\'/0\'/0/0');  // 导出路径
-      
-      // 使用公钥生成 Taproot 地址
-      const { address } = payments.p2tr({ internalPubkey: account.publicKey });
-      
-      console.log(address);  // 输出地址
-  })().catch(console.error);
-")
+    ADDRESS=$(node -e "
+      (async () => {
+          const bip39 = require('bip39');
+          const ecc = require('tiny-secp256k1');
+          const BIP32Factory = require('bip32').default;
+          const bitcoin = require('bitcoinjs-lib');
+          
+          const bip32 = BIP32Factory(ecc);
+          const { mnemonicToSeedSync } = bip39;
+          const { payments, taproot } = bitcoin;
+          
+          const mnemonic = '$MNEMONIC';
+          const seed = mnemonicToSeedSync(mnemonic);
+          const root = bip32.fromSeed(seed);
+          const account = root.derivePath('m/86\'/0\'/0\'/0/0');  // 导出路径
+          
+          // 取公钥的后 32 字节作为 x-only 公钥
+          const xOnlyPubKey = account.publicKey.slice(1);  
+          
+          // 使用 x-only 公钥生成 Taproot 地址
+          const { address } = payments.p2tr({ internalPubkey: xOnlyPubKey });
+          
+          console.log(address);  // 输出地址
+      })().catch(console.error);
+    ")
+
     if [ -n "$PRIVATE_KEY" ]; then
         echo "私钥: $PRIVATE_KEY"
     else
