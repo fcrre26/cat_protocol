@@ -386,20 +386,21 @@ function execute_mint() {
         return 1
     fi
 
-    # 开始 mint 操作
+    # 执行 mint 操作并捕获返回信息
     command="sudo yarn cli mint -i ${txid}_${index} $mint_amount"
+    
+    # 捕获命令的输出并存储到 OUTPUT 变量
+    OUTPUT=$($command 2>&1)
 
-    while true; do
-        $command
-
-        if [ $? -ne 0 ]; then
-            echo "mint 失败，继续下一次..."
-        else
-            echo "mint 成功"
-        fi
-
-        sleep 1
-    done
+    # 检查退出状态码
+    if [ $? -ne 0 ]; then
+        # 如果 mint 操作失败，打印错误信息
+        log_error "mint 失败: $OUTPUT"
+        return 1
+    else
+        # 如果 mint 操作成功，打印返回信息
+        echo "mint 成功: $OUTPUT"
+    fi
 
     cd ../../
 }
