@@ -395,6 +395,11 @@ function execute_mint() {
         return 1
     fi
 
+    # 定义颜色
+    GREEN='\033[0;32m'  # 绿色
+    RED='\033[0;31m'    # 红色
+    NC='\033[0m'        # 无颜色
+
     # 开始执行 mint 操作共 $mint_attempts 次
     count=0
     while [ $count -lt $mint_attempts ]; do
@@ -406,11 +411,11 @@ function execute_mint() {
 
         # 检查 mint 操作的退出状态
         if [ $? -ne 0 ]; then
-            # 如果 mint 操作失败，打印错误信息
-            log_error "第 $((count + 1)) 次 mint 失败: $OUTPUT"
+            # 如果 mint 操作失败，打印红色错误信息
+            echo -e "${RED}第 $((count + 1)) 次 mint 失败: $OUTPUT${NC}"
         else
-            # 如果 mint 操作成功，打印成功信息
-            echo "第 $((count + 1)) 次 mint 成功: $OUTPUT"
+            # 如果 mint 操作成功，打印绿色成功信息
+            echo -e "${GREEN}第 $((count + 1)) 次 mint 成功: $OUTPUT${NC}"
         fi
 
         # 增加计数器，不管成功还是失败
@@ -424,6 +429,7 @@ function execute_mint() {
 
     cd ../../
 }
+
 # 6. 查看 Fractal 节点运行情况
 function check_node_status() {
     echo "查看 Fractal 节点运行情况..."
