@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# 确保脚本从它所在的目录启动
+cd "$(dirname "$0")"
+
+
 # 自动化脚本菜单
 WALLET_LOG="wallet_info.txt"
 DOCKER_INSTALLED_FLAG="/tmp/docker_installed"
@@ -161,13 +165,17 @@ function run_docker_containers() {
     # 保存初始目录
     initial_dir=$(pwd)
 
-    # 切换到仓库的根目录（确保当前在正确的目录）
-    if [ ! -d "cat-token-box" ]; then
+    # 获取 cat-token-box 目录的绝对路径
+    repo_dir=$(realpath "cat-token-box")
+
+    # 确保仓库已经克隆
+    if [ ! -d "$repo_dir" ]; then
         log_error "找不到 cat-token-box 目录，请检查仓库是否正确克隆。"
         return 1
     fi
 
-    cd cat-token-box
+    # 切换到 cat-token-box 目录
+    cd "$repo_dir"
 
     # 确保 packages/tracker 目录存在
     if [ ! -d "packages/tracker/" ]; then
@@ -189,7 +197,7 @@ function run_docker_containers() {
     sudo docker-compose up -d
 
     # 返回到 cat-token-box 目录并构建 Docker 镜像
-    cd ../../
+    cd "$repo_dir"
     sudo docker build -t tracker:latest .
 
     # 运行 tracker 容器
@@ -209,7 +217,6 @@ function run_docker_containers() {
 
     echo "Fractal 节点和 CAT 索引器已启动。"
 }
-
 
 # 4. 创建新钱包
 function create_wallet() {
