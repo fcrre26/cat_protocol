@@ -409,8 +409,8 @@ function execute_mint() {
         # 捕获命令的输出并存储到 OUTPUT 变量
         OUTPUT=$($command 2>&1)
 
-        # 检查 mint 操作的退出状态
-        if [ $? -ne 0 ]; then
+        # 检查 mint 操作的输出中是否包含 "mint failed"
+        if echo "$OUTPUT" | grep -q "mint failed"; then
             # 如果 mint 操作失败，打印红色错误信息
             echo -e "${RED}第 $((count + 1)) 次 mint 失败: $OUTPUT${NC}"
         else
