@@ -204,6 +204,8 @@ function run_docker_containers() {
     echo "Fractal 节点和 CAT 索引器已启动。"
 }
 
+#!/bin/bash
+
 # 4. 创建新钱包
 function create_wallet() {
     echo "正在创建钱包，请稍候..."
@@ -248,8 +250,13 @@ EOL
         echo "config.json 文件已存在，跳过创建。"
     fi
 
+    # 清空 wallet.json 文件
+    echo "清空 wallet.json 文件..."
+    > wallet.json
+    echo "wallet.json 文件已清空。"
+
     # 创建新钱包并捕获输出
-    echo "钱包生成成功！"
+    echo "正在生成钱包..."
     WALLET_OUTPUT=$(sudo -E yarn cli wallet create 2>&1)
 
     if [ $? -ne 0 ]; then
@@ -257,13 +264,13 @@ EOL
         return 1
     fi
 
-    # 提取 wallet.json 文件内容
+    # 确保 wallet.json 文件生成成功
     if [ ! -f wallet.json ]; then
         echo "未找到 wallet.json 文件，钱包创建失败。"
         return 1
     fi
 
-    # 读取 wallet.json 文件
+    # 提取 wallet.json 文件内容
     ACCOUNT_PATH=$(jq -r '.accountPath' wallet.json)
     WALLET_NAME=$(jq -r '.name' wallet.json)
     MNEMONIC=$(jq -r '.mnemonic' wallet.json)
@@ -359,6 +366,9 @@ EOL
     cd ../../
 }
 
+# 调用 create_wallet 函数
+create_wallet
+
 # 5. 执行 mint
 function execute_mint() {
     echo "执行 mint 操作..."
@@ -447,17 +457,17 @@ function execute_mint() {
 function check_node_status() {
     echo "查看 Fractal 节点运行情况..."
 
+    # 切换到 /root 目录
+    cd /root || { echo "无法切换到 /root 目录"; return 1; }
+
     # 检查 Docker 和 docker-compose
     if ! check_docker; then
         return 1
     fi
 
-    # 保存初始目录
-    initial_dir=$(pwd)
-
     # 确保 cat-token-box/packages/tracker 目录存在
     if [ ! -d "cat-token-box/packages/tracker/" ]; then
-        log_error "找不到 packages/tracker/ 目录，请检查仓库是否正确克隆。"
+        echo "找不到 packages/tracker/ 目录，请检查仓库是否正确克隆。"
         return 1
     fi
 
@@ -472,8 +482,11 @@ function check_node_status() {
     done
 
     # 返回到初始目录
-    cd "$initial_dir"
+    # 不需要返回到初始目录，因为我们已经切换到 /root
 }
+
+# 调用 check_node_status 函数
+check_node_status
 
 # 菜单循环
 while true; do
