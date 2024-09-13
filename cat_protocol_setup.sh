@@ -349,7 +349,7 @@ EOL
 # 5. 执行 mint
 function execute_mint() {
     echo "执行 mint 操作..."
-    
+
     # 检查比特币 RPC 服务是否运行
     if ! nc -z 127.0.0.1 8332; then
         log_error "无法连接到比特币节点 (127.0.0.1:8332)。请确保比特币节点已启动。"
@@ -386,21 +386,39 @@ function execute_mint() {
         return 1
     fi
 
-    # 执行 mint 操作并捕获返回信息
-    command="sudo yarn cli mint -i ${txid}_${index} $mint_amount"
-    
-    # 捕获命令的输出并存储到 OUTPUT 变量
-    OUTPUT=$($command 2>&1)
-
-    # 检查退出状态码
-    if [ $? -ne 0 ]; then
-        # 如果 mint 操作失败，打印错误信息
-        log_error "mint 失败: $OUTPUT"
+    # 输入 mint 操作的执行次数
+    read -p "请输入要执行 mint 操作的次数: " mint_attempts
+    if ! [[ "$mint_attempts" =~ ^[0-9]+$ ]]; then
+        log_error "无效的次数，请输入一个正整数。"
         return 1
-    else
-        # 如果 mint 操作成功，打印返回信息
-        echo "mint 成功: $OUTPUT"
     fi
+
+    # 开始执行 mint 操作共 $mint_attempts 次
+    count=0
+    while [ $count -lt $mint_attempts ]; do
+        # 执行 mint 操作并捕获返回信息
+        command="sudo yarn cli mint -i ${txid}_${index} $mint_amount"
+        
+        # 捕获命令的输出并存储到 OUTPUT 变量
+        OUTPUT=$($command 2>&1)
+
+        # 检查 mint 操作的退出状态
+        if [ $? -ne 0 ]; then
+            # 如果 mint 操作失败，打印错误信息
+            log_error "第 $((count + 1)) 次 mint 失败: $OUTPUT"
+        else
+            # 如果 mint 操作成功，打印成功信息
+            echo "第 $((count + 1)) 次 mint 成功: $OUTPUT"
+        fi
+
+        # 增加计数器，不管成功还是失败
+        count=$((count + 1))
+        
+        # 为了避免过快的连续请求，可以加一个短暂的暂停
+        sleep 1
+    done
+
+    echo "已完成 $mint_attempts 次 mint 操作。"
 
     cd ../../
 }
