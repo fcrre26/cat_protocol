@@ -157,37 +157,26 @@ function run_docker_containers() {
         return
     fi
 
-    # 检查 Docker 和 docker-compose
-    if ! check_docker; then
-        return 1
-    fi
+    echo "切换到 /root/ 目录..."
+    cd /root || { log_error "无法进入 /root/ 目录。"; return 1; }
 
-    # 保存初始目录
-    initial_dir=$(pwd)
-
-    # 获取 cat-token-box 目录的绝对路径
-    repo_dir=$(realpath "cat-token-box")
-
-    # 确保仓库已经克隆
-    if [ ! -d "$repo_dir" ]; then
+    if [ ! -d "cat-token-box" ]; then
         log_error "找不到 cat-token-box 目录，请检查仓库是否正确克隆。"
         return 1
     fi
 
-    # 切换到 cat-token-box 目录
-    cd "$repo_dir"
+    cd cat-token-box || { log_error "无法进入 cat-token-box 目录。"; return 1; }
 
     # 确保 packages/tracker 目录存在
     if [ ! -d "packages/tracker/" ]; then
         log_error "找不到 packages/tracker/ 目录，请检查仓库是否正确克隆。"
-        cd "$initial_dir"  # 返回初始目录
         return 1
     fi
 
     echo "运行 Fractal 节点和 CAT 索引器..."
 
     # 切换到 tracker 目录
-    cd packages/tracker/ || exit
+    cd packages/tracker/ || { log_error "无法进入 packages/tracker/ 目录。"; return 1; }
 
     # 修改文件权限
     sudo chmod 777 docker/data
@@ -197,7 +186,7 @@ function run_docker_containers() {
     sudo docker-compose up -d
 
     # 返回到 cat-token-box 目录并构建 Docker 镜像
-    cd "$repo_dir"
+    cd ../..
     sudo docker build -t tracker:latest .
 
     # 运行 tracker 容器
@@ -208,9 +197,6 @@ function run_docker_containers() {
         -e RPC_HOST="host.docker.internal" \
         -p 3000:3000 \
         tracker:latest
-
-    # 返回到初始目录
-    cd "$initial_dir"
 
     # 标记节点已运行
     touch "$NODE_RUNNING_FLAG"
