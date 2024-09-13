@@ -190,7 +190,7 @@ function run_docker_containers() {
 
 # 4. 创建新钱包
 function create_wallet() {
-    echo "创建新钱包..."
+    echo "正在创建钱包，请稍候..."
 
     # 检查比特币 RPC 服务是否运行
     if ! nc -z 127.0.0.1 8332; then
@@ -233,7 +233,7 @@ EOL
     fi
 
     # 创建新钱包并捕获输出
-    echo "正在创建钱包，请稍候..."
+    echo "钱包生成成功！"
     WALLET_OUTPUT=$(sudo -E yarn cli wallet create 2>&1)
 
     if [ $? -ne 0 ]; then
@@ -281,35 +281,37 @@ EOL
           console.log(account.toWIF());  // 输出私钥
       })().catch(console.error);
     ")
-ADDRESS=$(node -e "
-  (async () => {
-      const bip39 = require('bip39');
-      const ecc = require('tiny-secp256k1');  // 使用 tiny-secp256k1 作为 ECC 库
-      const BIP32Factory = require('bip32').default;
-      const bitcoin = require('bitcoinjs-lib');
-      
-      // 初始化 ECC 库
-      bitcoin.initEccLib(ecc);
 
-      const bip32 = BIP32Factory(ecc);
-      const { mnemonicToSeedSync } = bip39;
-      const { payments } = bitcoin;
-      
-      const mnemonic = '$MNEMONIC';
-      const seed = mnemonicToSeedSync(mnemonic);
-      const root = bip32.fromSeed(seed);
-      const account = root.derivePath('m/86\'/0\'/0\'/0/0');  // 导出路径
-      
-      // 取公钥的后 32 字节作为 x-only 公钥
-      const xOnlyPubKey = account.publicKey.slice(1);  
-      
-      // 使用 x-only 公钥生成 Taproot 地址
-      const { address } = payments.p2tr({ internalPubkey: xOnlyPubKey });
-      
-      console.log(address);  // 输出地址
-  })().catch(console.error);
-")
+    ADDRESS=$(node -e "
+      (async () => {
+          const bip39 = require('bip39');
+          const ecc = require('tiny-secp256k1');  // 使用 tiny-secp256k1 作为 ECC 库
+          const BIP32Factory = require('bip32').default;
+          const bitcoin = require('bitcoinjs-lib');
+          
+          // 初始化 ECC 库
+          bitcoin.initEccLib(ecc);
 
+          const bip32 = BIP32Factory(ecc);
+          const { mnemonicToSeedSync } = bip39;
+          const { payments } = bitcoin;
+          
+          const mnemonic = '$MNEMONIC';
+          const seed = mnemonicToSeedSync(mnemonic);
+          const root = bip32.fromSeed(seed);
+          const account = root.derivePath('m/86\'/0\'/0\'/0/0');  // 导出路径
+          
+          // 取公钥的后 32 字节作为 x-only 公钥
+          const xOnlyPubKey = account.publicKey.slice(1);  
+          
+          // 使用 x-only 公钥生成 Taproot 地址
+          const { address } = payments.p2tr({ internalPubkey: xOnlyPubKey });
+          
+          console.log(address);  // 输出地址
+      })().catch(console.error);
+    ")
+
+    # 打印输出结果
     if [ -n "$PRIVATE_KEY" ]; then
         echo "私钥: $PRIVATE_KEY"
     else
@@ -317,7 +319,7 @@ ADDRESS=$(node -e "
     fi
 
     if [ -n "$ADDRESS" ]; then
-        echo "地址 (Taproot格式): $ADDRESS"
+        echo "地址（Taproot）: $ADDRESS"
     else
         echo "地址未生成或无法提取."
     fi
@@ -330,7 +332,7 @@ ADDRESS=$(node -e "
 
     # 记录钱包信息到文件，带有时间戳
     WALLET_LOG="wallet_creation_log.txt"
-    echo "钱包信息已保存到 $WALLET_LOG"
+    echo "钱包信息已保存到：$(pwd)/$WALLET_LOG; $(pwd)/wallet.json"
     {
         echo "钱包创建时间: $(date)"
         echo "钱包名称: $WALLET_NAME"
