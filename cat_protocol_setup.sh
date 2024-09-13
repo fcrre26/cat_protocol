@@ -158,7 +158,10 @@ function run_docker_containers() {
         return 1
     fi
 
-    # 检查目录是否存在
+    # 保存初始目录
+    initial_dir=$(pwd)
+
+    # 确保 cat-token-box/packages/tracker/ 目录存在
     if [ ! -d "cat-token-box/packages/tracker/" ]; then
         log_error "找不到 packages/tracker/ 目录，请检查仓库是否正确克隆。"
         return 1
@@ -166,13 +169,21 @@ function run_docker_containers() {
 
     echo "运行 Fractal 节点和 CAT 索引器..."
 
+    # 切换到 tracker 目录
     cd ./cat-token-box/packages/tracker/ || exit
+
+    # 修改文件权限
     sudo chmod 777 docker/data
     sudo chmod 777 docker/pgdata
+
+    # 使用 docker-compose 启动服务
     sudo docker-compose up -d
 
+    # 返回到 cat-token-box 目录并构建 Docker 镜像
     cd ../../
     sudo docker build -t tracker:latest .
+
+    # 运行tracker 容器
     sudo docker run -d \
         --name tracker \
         --add-host="host.docker.internal:host-gateway" \
@@ -180,6 +191,9 @@ function run_docker_containers() {
         -e RPC_HOST="host.docker.internal" \
         -p 3000:3000 \
         tracker:latest
+
+    # 返回到初始目录
+    cd "$initial_dir"
 
     # 标记节点已运行
     touch "$NODE_RUNNING_FLAG"
