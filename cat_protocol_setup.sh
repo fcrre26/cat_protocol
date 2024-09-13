@@ -356,14 +356,16 @@ function execute_mint() {
         return 1
     fi
 
-    cd cat-token-box/packages/cli || exit
+    cd /root/cat-token-box/packages/cli || exit
 
-    echo "可用钱包:"
-    cat ../../$WALLET_LOG
+    # 自动加载钱包文件，不再手动选择
+    WALLET_FILE="/root/cat-token-box/packages/cli/wallet.json"
+    if [ ! -f "$WALLET_FILE" ]; then
+        log_error "未找到 wallet.json 文件，请先创建钱包。"
+        return 1
+    fi
 
-    # 钱包选择
-    echo "请输入要使用的钱包索引 (例如 1):"
-    read -r wallet_index
+    echo "已找到钱包：$WALLET_FILE"
 
     # 输入交易哈希 (txid)
     read -p "请输入交易哈希 (txid): " txid
@@ -422,7 +424,6 @@ function execute_mint() {
 
     cd ../../
 }
-
 # 6. 查看 Fractal 节点运行情况
 function check_node_status() {
     echo "查看 Fractal 节点运行情况..."
