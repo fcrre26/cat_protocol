@@ -457,19 +457,32 @@ function execute_mint() {
 function check_node_status() {
     echo "查看 Fractal 节点运行情况..."
 
-    # 检查 docker-compose 是否安装
+    # 检查 Docker 和 docker-compose
     if ! check_docker; then
         return 1
     fi
 
+    # 保存初始目录
+    initial_dir=$(pwd)
+
+    # 确保 cat-token-box/packages/tracker 目录存在
+    if [ ! -d "cat-token-box/packages/tracker/" ]; then
+        log_error "找不到 packages/tracker/ 目录，请检查仓库是否正确克隆。"
+        return 1
+    fi
+
+    # 切换到 tracker 目录
     cd cat-token-box/packages/tracker || exit
+
+    # 循环查看日志
     while true; do
         sudo docker-compose logs --tail=10
         sleep 5
         clear
     done
 
-    cd ../../
+    # 返回到初始目录
+    cd "$initial_dir"
 }
 
 # 菜单循环
