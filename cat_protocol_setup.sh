@@ -366,9 +366,6 @@ EOL
     cd ../../
 }
 
-# 调用 create_wallet 函数
-create_wallet
-
 # 5. 执行 mint
 function execute_mint() {
     echo "执行 mint 操作..."
@@ -484,9 +481,6 @@ function check_node_status() {
     # 返回到初始目录
     # 不需要返回到初始目录，因为我们已经切换到 /root
 }
-
-# 调用 check_node_status 函数
-check_node_status
 
 # 菜单循环
 while true; do
