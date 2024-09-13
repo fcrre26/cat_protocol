@@ -275,9 +275,6 @@ EOL
 
     echo "助记词: $MNEMONIC"
 
-    # 使用助记词生成私钥和 Taproot 地址
-    echo "正在通过助记词生成私钥和 Taproot 地址..."
-
     # 生成私钥和地址的代码
     PRIVATE_KEY=$(node -e "
       (async () => {
